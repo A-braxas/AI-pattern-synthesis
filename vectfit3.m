@@ -1,4 +1,4 @@
-function [poles,residues,rmserr,fit]=vectfit3(f,s,poles,weight,opts)
+function [poles,residues,D,E,rmserr,fit]=vectfit3(f,s,poles,weight,opts)
 %UNTITLED 此处显示有关此函数的摘要
 %   此处显示详细说明
 % 
@@ -706,6 +706,6 @@ else
 end %if cmplx_ss~=1     
      
 SER.A=A; SER.B=B; SER.C=C; SER.D=D; SER.E=E; 
-residues=[C D E];
+residues=C;
 end
 

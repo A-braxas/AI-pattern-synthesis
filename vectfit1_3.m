@@ -4,11 +4,20 @@
 % 拟合进行了P次迭代，得到了[A,C,D,E,ff]等参数，并通过readvect复原
 % ---------------------------
 % 在（1_3）版本中，将完成以下目标：
-% 1.阶数Norder变成Ndata*1维度
-% 2.对out进行文件读写
-% 3.对阶数从10：2：50进行扫描，每次误差用数组储存，对误差画图分析，找出误差最小值对应的最小阶数
-% 4.建立一个Ndata*1的[阶数]数组，其后再用此阶数对函数重新拟合，并记录极点留数
-% 5。对迭代次数也可以进行扫描分析
+% 1.阶数Norder变成Ndata*1维度（✓）
+% 2.对out进行文件读写(✓)
+% 3.对阶数从10：2：50进行扫描，每次误差用数组储存，对误差画图分析，找出误差最小值对应的最小阶数（✓）
+% 4.建立一个Ndata*1的[阶数]数组，其后再用此阶数对函数重新拟合，并记录极点留数（✓）
+% 5。对迭代次数也可以进行扫描分析（×）
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% 流程：
+% 1.天线变量初始化
+% 2.生成方向图
+% 3.vector fitting参数设置
+% 4.扫描阶数
+% 5.作阶数-误差关系图，找最小误差阶数，按最小阶数重新生成极点留数
+% 6.复数按虚实和奇偶拆分，并输出极点留数储存矩阵
+% 7.读取储存矩阵并复原测试
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%
 clc;clear all;close all;
@@ -81,81 +90,98 @@ Internal=2;%间距
 MaxOrder=50;%终点
 Len=floor((MaxOrder-MinOrder)/Internal)+1;%扫描次数
 Norder=MinOrder:Internal:MaxOrder;%扫描节点
-%设置阶数、极点、留数、误差、拟合函数的存储矩阵
-OrderList=zeros(Ntest,1);
-An=zeros(Ntest,MaxOrder);%！！
-CDE=zeros(Ntest,MaxOrder+2);%An和Cn分别为极点和留数矩阵,'+2'为D，E
+%设置误差存储矩阵
 Err=zeros(Ntest,Len); %均方误差
-Ffit=zeros(Ntest,Nsmp);%拟合函数
+%% 阶数扫描
 for i=1:Ntest
-    %阶数扫描
     for ii=1:Len
         Q=Norder(ii);%临时阶数
         %设置最佳初始极点
-        initpoles=zeros(1,Q);  %initpoles为初始极点矩阵
-        for k0=1:2:Q
-            beta=offset+1+Nsmp*(k0-1)/Q;
-            alpha=(beta-1)/100;
-            initpoles(k0)=-alpha+1i*beta;
-            initpoles(k0+1)=-alpha-1i*beta;
-        end
-        %% 向量拟合与迭代计算
+        startpoles=InitPoles(Q,offset,Nsmp);
+        %向量拟合与迭代计算
         P=1;%P为迭代次数
         %[a2 cde2 rmserr fit]=[极点A 留数C和DE 均方根误差 拟合函数]
-        [t1,t2,rmserr,fit]=vectfit3(Ftest(i,:),S2,initpoles,weight,opts);
+        [t1,t2,t3,t4,rmserr,fit]=vectfit3(Ftest(i,:),S2,startpoles,weight,opts);
         for iii=1:P-1
-            [t1,t2,rmserr,fit]=vectfit3(Ftest(i,:),S2,t1,weight,opts);
+            [t1,t2,t3,t4,rmserr,fit]=vectfit3(Ftest(i,:),S2,t1,weight,opts);
         end
         Err(i,ii)=rmserr;%!!
     end
 end
+%% 作阶数-误差关系图
+if(0)
 figure(1);
 for i=1:Ntest
-    S3=MinOrder:Internal:MaxOrder;;
+    S3=MinOrder:Internal:MaxOrder;
     plot(S3,log(Err(i,:)));
     hold on;
 end
-
-
-
-if(0)
-%% 极点和留数分组储存
-r_an=real(An);i_an=imag(An);i_an1=abs(i_an)-offset;
-r_cde=real(CDE);i_cde=imag(CDE);
-r_c=r_cde(:,1:Norder);
-i_c=i_cde(:,1:Norder);
-
-k0=Norder;%阶数
-k1=r_an(:,1:2:end); %极点A-实数部分-奇数组
-k2=i_an1(:,1:2:end); %极点A-（虚数部分绝对值-80000）-奇数组
-k3=r_c(:,1:2:end); %留数C-实数部分-奇数组
-k4=i_c(:,1:2:end);% 留数C-虚数部分-奇数组
-k5=r_cde(:,Norder+1); %D-实数部分
-k6=(1e6)*r_cde(:,Norder+2);%1e6*E-实数部分
-k7=Nsmp;%采样点数
-k8=offset;%S2的位移量
-for i=1:Ndata
-    
-    out=[k0 k1(i) k2(i) k3(i) k4(i) k5(i) k6(i) k7 k8];
-    %out=[k0 k1 k2 k3 k4 k5 k6 k7 k8];
 end
+%记录最小误差下的阶数
+OrderList=zeros(Ntest,1);%阶数列表
+[minErr,index]=min(Err');
+for i=1:Ntest
+    OrderList(i)=Norder(index(i));
+end
+
+%% 按最小阶数重新生成极点留数
+%设置极点、留数、拟合函数的存储矩阵
+MaxOrderList=max(OrderList);
+An=zeros(Ntest,MaxOrderList);%An和Cn分别为极点和留数矩阵,
+Cn=zeros(Ntest,MaxOrderList);%
+D=zeros(Ntest,1);
+E=zeros(Ntest,1);
+Err2=zeros(Ntest,1);
+Ffit=zeros(Ntest,Nsmp);
+for i=1:Ntest
+    Len2=OrderList(i);
+    startpoles=InitPoles(Len2,offset,Nsmp);
+    [An(i,1:Len2),Cn(i,1:Len2),D(i),E(i),Err2(i),Ffit(i,:)]=vectfit3(Ftest(i,:),S2,startpoles,weight,opts);
+end
+%% 复数按虚实和奇偶拆分
+if(1)
 %{
-A=k1±j*(k2+offset)
-C=k3±j*k4
-D=k5
-E=k6*1e-6
+A=Re_An±j*Im_An
+C=Re_Cn±j*Im_Cn
+D=D
+E=E
 %}
+Re_An=real(An(:,1:2:end));Im_An=imag(An(:,1:2:end));
+Re_Cn=real(Cn(:,1:2:end));Im_Cn=imag(Cn(:,1:2:end));
+OUT=[OrderList Re_An Im_An Re_Cn Im_Cn D E*1e6];    % !!!E*1e6,注意恢复
+end
+%% 输出
+if(1)
+filepath='SavedDataAsFormOf_order_An_Cn_D_E.txt';
+
+fileID = fopen(filepath,'w');
+fprintf(fileID,[repmat('%f,', 1, size(OUT,2)), '\n'], OUT');
+fprintf('/n');
+fclose(fileID);
+end
 
 %% 极点和留数复原
-% 对k需要前置处理
-% [frcv,smp,A,C,D,E]=readvect(k0, k1, k2, k3, k4, k5, k6, k7, k8)
-% err=sqrterror(fit,frcv)
-
-
+if(1)
+%对k需要前置处理
+[order,An,Cn,D,E,frcv]=readvect(filepath);
+err=SqrtError(Ffit,frcv)
+Err2
 end
-%% 求均方误差函数
-function err=sqrterror(f1,f2);
-err=sum(abs(f1-f2).^2);
+
+%% 自定义函数
+% 初始化极点矩阵
+function startpoles=InitPoles(Q,offset,Nsmp)
+    startpoles=zeros(1,Q);  %startpoles为初始极点矩阵
+    for iiii=1:2:Q
+        beta=offset+1+Nsmp*(iiii-1)/Q;
+        alpha=(beta-1)/100;
+        startpoles(iiii)=-alpha+1i*beta;
+        startpoles(iiii+1)=-alpha-1i*beta;
+    end
+end
+% 求均方误差函数
+function err=SqrtError(f1,f2)
+err=sqrt(sum(abs((f1-f2).^2),2)/size(f1,2));
 end
 
 
