@@ -1,4 +1,4 @@
-function [order,A,C,D,E,frcv]=readvect(filepath);
+function [order,A,C,D,E,frcv]=readvect(filepath)
 %================================================
 % Order %阶数
 % Re_An %极点A-实数部分-奇数组
@@ -8,20 +8,26 @@ function [order,A,C,D,E,frcv]=readvect(filepath);
 % D     %D-实数部分
 % E     %E-实数部分
 %================================================
+way=2;%写入方式：1-fprint；2-csvwrite
 Nsmp=3600;
 offset=8e4;
 S=1j*((1:Nsmp)+offset);
+if way==1
+    ifnan=1;%尾列为NaN
+elseif way==2
+    ifnan=0;
+end
 
 RecoverData=readmatrix(filepath,'Delimiter',',');
-[nrow,ncol]=size(RecoverData);%尾列为NaN
+[nrow,ncol]=size(RecoverData);
 
 Ndata=nrow;
 order=RecoverData(:,1);
-D=RecoverData(:,end-2);
-E=RecoverData(:,end-1)*1e-6;
+D=RecoverData(:,end-1-ifnan);
+E=RecoverData(:,end-ifnan)*1e-6;
 
-MaxOrder=(ncol-4)/2;
-RemainData=RecoverData(:,2:end-3);
+MaxOrder=(ncol-3-ifnan)/2;
+RemainData=RecoverData(:,2:end-2-ifnan);
 
 Re_An=RemainData(:,1:MaxOrder/2);
 Im_An=RemainData(:,1+MaxOrder/2:MaxOrder);
@@ -39,4 +45,5 @@ for i=1:Ndata
     end
 end
 %由于忽略了B和浮点储存的原因，恢复后会增加1e-26级别的误差。
+size(frcv)
 end

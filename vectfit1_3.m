@@ -37,7 +37,7 @@ S1=1:1:Nsmp;   %采样序列
 thta=-pi+2*pi/Nsmp:2*pi/Nsmp:pi; % -pi to pi
 
 %% 产生阵列方向图
-Ndata=157;%训练数据和测试数据一共Ndata组
+Ndata=200;%训练数据和测试数据一共Ndata组
 rng(0);
 m=round(rand(Ndata,Nunit)*1);%产生Ndata*Nunit的0/1的随机数作为阵列的输入
 m(sum(m,2)==0,1)=1;%确保每组幅值至少一个不为0
@@ -58,7 +58,7 @@ for i=1:Ndata
 end
 %% Vectfit参数设置
 %取测试数据
-Ntest=157;    % Ntest < Ndata
+Ntest=200;    % Ntest < Ndata
 Ftest=Ftotal(1:Ntest,:);
 
 %由于vectfit是在复频域进行拟合，需要把坐标轴挪到远离低频的复数域
@@ -151,21 +151,29 @@ Re_Cn=real(Cn(:,1:2:end));Im_Cn=imag(Cn(:,1:2:end));
 OUT=[OrderList Re_An Im_An Re_Cn Im_Cn D E*1e6];    % !!!E*1e6,注意恢复
 end
 %% 输出
-if(1)
+if(0)
 filepath='SavedDataAsFormOf_order_An_Cn_D_E.txt';
 
 fileID = fopen(filepath,'w');
 fprintf(fileID,[repmat('%f,', 1, size(OUT,2)), '\n'], OUT');
 fprintf('/n');
 fclose(fileID);
+elseif(1) %% 按.csv格式保存数据
+    writematrix(OUT,'Labels_order_An_Cn_D_E.csv');
+    writematrix(m,'Features_m.csv');
+    writematrix(Ffit,'Ffit.csv');
 end
 
 %% 极点和留数复原
-if(1)
+if(0)
 %对k需要前置处理
 [order,An,Cn,D,E,frcv]=readvect(filepath);
 err=SqrtError(Ffit,frcv)
 Err2
+elseif(1)
+[order2,An2,Cn2,D2,E2,frcv]=readvect('Labels_order_An_Cn_D_E.csv');
+err=SqrtError(Ffit,frcv)
+Err2;
 end
 
 %% 自定义函数
