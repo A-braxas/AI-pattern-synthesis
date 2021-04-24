@@ -43,7 +43,8 @@ for i=1:Ndata
         sub=S(ii)-A(i,:);%广播
         frcv(i,ii)=sum(C(i,:)./(sub))+D(i)+S(ii)*E(i);%由output恢复的拟合函数,
     end
+    size(frcv);
 end
 %由于忽略了B和浮点储存的原因，恢复后会增加1e-26级别的误差。
-size(frcv)
+frcv;
 end

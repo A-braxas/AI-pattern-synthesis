@@ -22,6 +22,10 @@
 % 取的样本数要足够大，才能在每个分支中产生足够多的训练数据（✓）
 % 3.输出最大分支，即样本数量最多的阶数分支（✓）
 % 4.从输出中剔除掉恢复误差过大的数据（✓），并找到原因（待分析）
+% >恢复出的数据出现较大恢复误差的原因：
+% a.存储精度的问题。在内存写入到磁盘的存储过程中，由于精度不一致导致极点留数（ACDE）的损失，
+% 而某些样本中，函数（Ffit）对极点留数很敏感，导致函数的恢复误差较大。
+% b.读写时间问题。可能由于矩阵还未写完，立刻就读取，导致数据的不稳定。
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % 流程：
 % 1.天线变量初始化
@@ -43,7 +47,7 @@ ks=2*pi*sqrt(e)/lambda;  %介质中的相位常数
 l=0.004;    %贴片宽度
 p=0.005;    %单元周期间隔
 Nunit=3;    %阵列单元的个数
-Nscan=7;
+Nscan=1;
 Ndata=Nscan^Nunit;  %训练数据和测试数据一共Ndata组
 Nsmp=3600*1;  %采样点数
 Ntest=floor(Ndata*1);    % Ntest < Ndata
@@ -85,7 +89,7 @@ if(1)   %(1_5) %产生Ndata*Nunit的均匀分布数作为阵列的输入
     m(m>=1)=0.95;
     m(m<=0)=0.05;    %确保每组幅值在0～1之间
 elseif(0)   %(1_4);%产生Ndata*Nunit的0～1的随机数作为阵列的输入
-    rng(0);
+    rng();
     m=rand(Ndata,Nunit)*1
     m(m==0)=0.5;    %确保每组幅值至少一个不为0
 elseif(0)   %产生Ndata*Nunit的0/1的随机数作为阵列的输入
@@ -108,12 +112,23 @@ for i=1:Ndata
     %max_f=max(Funit.*abs(Farray(i,:)));
     %Fnorm(i,:)=20*log10(Funit.*abs(Farray(i,:))/max_f);
 end
+if(0)%% 不同幅值下的方向图
+    figure(5);
+    for i=1:Ntest
+        plot(thta/(2*pi)*360,10*log10(abs(Ftotal(i,:)/max(Ftotal(i,:)))));
+        xlabel('角度(deg)');ylabel('归一化方向性函数(dB)');
+        grid on;
+        hold on;
+    end
+end
+
 %% Vectfit参数设置
+if(1)   %%func_test
 %取测试数据
 Ftest=Ftotal(1:Ntest,:);
 
 % 释放内存
-clear -regexp 'F(total|array|unit)'
+% clear -regexp 'F(total|array|unit)'
 
 %由于vectfit是在复频域进行拟合，需要把坐标轴挪到远离低频的复数域
 offset=8e4;
@@ -233,7 +248,6 @@ elseif(1) %% 按.csv格式保存数据
     writematrix(OUT,'Labels_order_An_Cn_D_E.csv');
     writematrix(m,'Features_m.csv');
     % writematrix(Ffit,'Ffit.csv');
-
 end
 
 %% 极点和留数复原
@@ -243,32 +257,52 @@ if(0)
 err=SqrtError(Ffit,frcv)
 Err2
 elseif(1)
-[order2,An2,Cn2,D2,E2,frcv]=readvect('Labels_order_An_Cn_D_E.csv');
-err=SqrtError(Ffit,frcv);
-err2=SqrtError(Ftest,frcv);
-Err2;
+[order2,An2,Cn2,D2,E2,frcv2]=readvect('Labels_order_An_Cn_D_E.csv');
+
+sum(sum(OrderList-order2))
+sum(sum(An-An2))
+sum(sum(Cn-Cn2))
+sum(sum(D-D2))
+sum(sum(E-E2))
+
 
 % 剔除脏数据，并再次输出
+err2=SqrtError(Ftest,frcv2);
 index=err2>Errthreshold;
+origin1=m(~index,:);
+origin2=OUT(~index,:);
+
 m(index,:)=[];
 OUT(index,:)=[];
 Ftest(index,:)=[];
 Ffit(index,:)=[];
-clear frcv;
+frcv2(index,:)=[];
+%clear frcv;
+sum(sum(origin1-m))
+sum(sum(origin2-OUT))
 
-    
-    writematrix(OUT,'Labels_order_An_Cn_D_E.csv');
-    writematrix(m,'Features_m.csv');
-
-
-    
-[order2,An2,Cn2,D2,E2,frcv2]=readvect('Labels_order_An_Cn_D_E.csv');
 err=SqrtError(Ffit,frcv2);
 err2=SqrtError(Ftest,frcv2);
-    
+Err2;
+
+writematrix(OUT,'2Labels_order_An_Cn_D_E.csv');
+writematrix(m,'2Features_m.csv');
+%     
+% [order3,An3,Cn3,D3,E3,frcv3]=readvect('2Labels_order_An_Cn_D_E.csv');
+% 
+% 
+% sum(sum(OrderList(~index)-order3))
+% sum(sum(An(~index)-An3))
+% sum(sum(Cn(~index)-Cn3))
+% sum(sum(D(~index)-D3))
+% sum(sum(E(~index)-E3))
+% 
+% err3=SqrtError(Ffit,frcv3);
+% err4=SqrtError(Ftest,frcv3);
+%     
 
 end
-
+end
 %% 自定义函数
 % 初始化极点矩阵
 function startpoles=InitPoles(Q,offset,Nsmp)

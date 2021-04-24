@@ -584,7 +584,8 @@ SERC  = C;
   diff=fit-f; rmserr=sqrt(sum(sum(abs(diff.^2))))/sqrt(Nc*Ns); 
  
 if opts.spy2==1 
-  freq=s./(2*pi*1i); 
+  %%%%%% freq=s./(2*pi*1i); 
+  freq = ((s*(-1i)-8e4)/3600*(2*pi)-pi)/(2*pi)*360; 
   if opts.logx==1      
     if opts.logy==1 
       figure(1), 
@@ -629,7 +630,8 @@ if opts.spy2==1
     end   
   end %logy=0 
   figure(1), 
-  xlabel('Frequency [Hz]'); ylabel('Magnitude'); 
+  %%%%%% xlabel('Frequency [Hz]'); ylabel('Magnitude'); 
+  xlabel('Angel [degree]'); ylabel('Gain(dB)'); 
   %title('Approximation of f'); 
   if opts.legend==1 
     if opts.errplot==1 
